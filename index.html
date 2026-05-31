@@ -53,12 +53,11 @@
     let allVideos = [];
     let apiKey = localStorage.getItem('youtubeApiKey') || '';
 
-    // Uploads Playlists
-    const uploadsPlaylists = {
-      official: "UUaO6TYtlC8U5ttz62hTrZgg",   // JYP 2PM uploads
-      junho: "UUowTHOjp47dzNxR8cz83LGA",
-      taecyeon: "UURX7AhiIgsKuVkVj4CrkjLA",
-      junk: "UUYHnkkcrclYlgiIeQKVs9Rw"
+    const channels = {
+      official: "UCaO6TYtlC8U5ttz62hTrZgg",
+      junho: "UCowTHOjp47dzNxR8cz83LGA",
+      taecyeon: "UCRX7AhiIgsKuVkVj4CrkjLA",
+      junk: "UCYHnkkcrclYlgiIeQKVs9Rw"
     };
 
     function loadSavedKey() {
@@ -68,13 +67,14 @@
       }
     }
 
-    async function fetchAllFromPlaylist(playlistId, channelName) {
+    async function fetchAllFromChannel(channelId, channelName, extraQuery = "") {
       if (!apiKey) return;
       let pageToken = '';
-      let count = 0;
+      let fetchedCount = 0;
 
       do {
-        let url = `https://www.googleapis.com/youtube/v3/playlistItems?key=${apiKey}&playlistId=${playlistId}&part=snippet&maxResults=50&pageToken=${pageToken}`;
+        let url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${channelId}&part=snippet&maxResults=50&order=date&type=video&pageToken=${pageToken}`;
+        if (extraQuery) url += `&q=${encodeURIComponent(extraQuery)}`;
 
         try {
           const res = await fetch(url);
@@ -85,7 +85,7 @@
             const video = {
               title, 
               date: item.snippet.publishedAt.split('T')[0],
-              url: `https://www.youtube.com/watch?v=${item.snippet.resourceId.videoId}`,
+              url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
               thumb: item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default.url,
               channel: channelName
             };
@@ -94,15 +94,17 @@
             allVideos.push(video);
           });
 
-          count += data.items?.length || 0;
+          fetchedCount += data.items?.length || 0;
           pageToken = data.nextPageToken;
-          document.getElementById('status').innerHTML = `Fetching ${channelName}... (${count} videos)`;
+
+          // Optional: Show progress
+          document.getElementById('status').innerHTML = `Fetching... (${fetchedCount} videos so far from ${channelName})`;
 
         } catch(e) { 
           console.error(e);
           break; 
         }
-      } while (pageToken);
+      } while (pageToken);   // ← No limit now, continues until no more pages
     }
 
     async function fetchVideos() {
@@ -114,13 +116,13 @@
       if (!apiKey) return alert("Please paste your API key");
 
       allVideos = [];
-      document.getElementById('timeline').innerHTML = '<p style="text-align:center; color:#ff9800;">Fetching ALL videos using Uploads Playlist (best method for older content)...</p>';
+      document.getElementById('timeline').innerHTML = '<p style="text-align:center; color:#ff9800;">Fetching ALL videos (this may take a while)...</p>';
 
       await Promise.all([
-        fetchAllFromPlaylist(uploadsPlaylists.official, "Official 2PM"),
-        fetchAllFromPlaylist(uploadsPlaylists.junho, "Junho"),
-        fetchAllFromPlaylist(uploadsPlaylists.taecyeon, "Taecyeon"),
-        fetchAllFromPlaylist(uploadsPlaylists.junk, "Jun.K")
+        fetchAllFromChannel(channels.official, "Official 2PM", "2PM"),
+        fetchAllFromChannel(channels.junho, "Junho"),
+        fetchAllFromChannel(channels.taecyeon, "Taecyeon"),
+        fetchAllFromChannel(channels.junk, "Jun.K")
       ]);
 
       allVideos = allVideos.filter((v, i, a) => a.findIndex(t => t.url === v.url) === i);
@@ -156,7 +158,8 @@
       select.innerHTML = '<option value="">All Years</option>';
       years.forEach(year => {
         const opt = document.createElement('option');
-        opt.value = year; opt.textContent = year;
+        opt.value = year; 
+        opt.textContent = year;
         select.appendChild(opt);
       });
     }
@@ -180,6 +183,7 @@
       if (confirm("Clear everything?")) {
         allVideos = [];
         localStorage.removeItem('youtubeApiKey');
+        apiKey = '';
         document.getElementById('apiKey').value = '';
         document.getElementById('timeline').innerHTML = '';
         document.getElementById('status').innerHTML = 'Data cleared.';
