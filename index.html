@@ -46,7 +46,7 @@
     <select id="yearFilter" onchange="filterTimeline()"></select>
   </div>
 
-  <div id="status">Ready.</div>
+  <div id="status">Ready. Click Fetch to load videos.</div>
   <div id="timeline"></div>
 
   <script>
@@ -70,7 +70,7 @@
     async function fetchAllFromChannel(channelId, channelName, extraQuery = "") {
       if (!apiKey) return;
       let pageToken = '';
-      let fetchedCount = 0;
+      let count = 0;
 
       do {
         let url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${channelId}&part=snippet&maxResults=50&order=date&type=video&pageToken=${pageToken}`;
@@ -94,17 +94,12 @@
             allVideos.push(video);
           });
 
-          fetchedCount += data.items?.length || 0;
+          count += data.items?.length || 0;
           pageToken = data.nextPageToken;
+          document.getElementById('status').innerHTML = `Fetching ${channelName}... (${count} videos)`;
 
-          // Optional: Show progress
-          document.getElementById('status').innerHTML = `Fetching... (${fetchedCount} videos so far from ${channelName})`;
-
-        } catch(e) { 
-          console.error(e);
-          break; 
-        }
-      } while (pageToken);   // ← No limit now, continues until no more pages
+        } catch(e) { break; }
+      } while (pageToken);
     }
 
     async function fetchVideos() {
@@ -116,7 +111,7 @@
       if (!apiKey) return alert("Please paste your API key");
 
       allVideos = [];
-      document.getElementById('timeline').innerHTML = '<p style="text-align:center; color:#ff9800;">Fetching ALL videos (this may take a while)...</p>';
+      document.getElementById('timeline').innerHTML = '<p style="text-align:center; color:#ff9800;">Fetching ALL videos... This can take 30-90 seconds.</p>';
 
       await Promise.all([
         fetchAllFromChannel(channels.official, "Official 2PM", "2PM"),
@@ -158,8 +153,7 @@
       select.innerHTML = '<option value="">All Years</option>';
       years.forEach(year => {
         const opt = document.createElement('option');
-        opt.value = year; 
-        opt.textContent = year;
+        opt.value = year; opt.textContent = year;
         select.appendChild(opt);
       });
     }
@@ -183,7 +177,6 @@
       if (confirm("Clear everything?")) {
         allVideos = [];
         localStorage.removeItem('youtubeApiKey');
-        apiKey = '';
         document.getElementById('apiKey').value = '';
         document.getElementById('timeline').innerHTML = '';
         document.getElementById('status').innerHTML = 'Data cleared.';
