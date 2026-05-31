@@ -46,18 +46,19 @@
     <select id="yearFilter" onchange="filterTimeline()"></select>
   </div>
 
-  <div id="status">Ready. Click Fetch to load videos.</div>
+  <div id="status">Ready.</div>
   <div id="timeline"></div>
 
   <script>
     let allVideos = [];
     let apiKey = localStorage.getItem('youtubeApiKey') || '';
 
-    const channels = {
-      official: "UCaO6TYtlC8U5ttz62hTrZgg",
-      junho: "UCowTHOjp47dzNxR8cz83LGA",
-      taecyeon: "UCRX7AhiIgsKuVkVj4CrkjLA",
-      junk: "UCYHnkkcrclYlgiIeQKVs9Rw"
+    // Uploads Playlists
+    const uploadsPlaylists = {
+      official: "UUaO6TYtlC8U5ttz62hTrZgg",   // JYP 2PM uploads
+      junho: "UUowTHOjp47dzNxR8cz83LGA",
+      taecyeon: "UURX7AhiIgsKuVkVj4CrkjLA",
+      junk: "UUYHnkkcrclYlgiIeQKVs9Rw"
     };
 
     function loadSavedKey() {
@@ -67,14 +68,13 @@
       }
     }
 
-    async function fetchAllFromChannel(channelId, channelName, extraQuery = "") {
+    async function fetchAllFromPlaylist(playlistId, channelName) {
       if (!apiKey) return;
       let pageToken = '';
       let count = 0;
 
       do {
-        let url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${channelId}&part=snippet&maxResults=50&order=date&type=video&pageToken=${pageToken}`;
-        if (extraQuery) url += `&q=${encodeURIComponent(extraQuery)}`;
+        let url = `https://www.googleapis.com/youtube/v3/playlistItems?key=${apiKey}&playlistId=${playlistId}&part=snippet&maxResults=50&pageToken=${pageToken}`;
 
         try {
           const res = await fetch(url);
@@ -85,7 +85,7 @@
             const video = {
               title, 
               date: item.snippet.publishedAt.split('T')[0],
-              url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
+              url: `https://www.youtube.com/watch?v=${item.snippet.resourceId.videoId}`,
               thumb: item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default.url,
               channel: channelName
             };
@@ -98,7 +98,10 @@
           pageToken = data.nextPageToken;
           document.getElementById('status').innerHTML = `Fetching ${channelName}... (${count} videos)`;
 
-        } catch(e) { break; }
+        } catch(e) { 
+          console.error(e);
+          break; 
+        }
       } while (pageToken);
     }
 
@@ -111,13 +114,13 @@
       if (!apiKey) return alert("Please paste your API key");
 
       allVideos = [];
-      document.getElementById('timeline').innerHTML = '<p style="text-align:center; color:#ff9800;">Fetching ALL videos... This can take 30-90 seconds.</p>';
+      document.getElementById('timeline').innerHTML = '<p style="text-align:center; color:#ff9800;">Fetching ALL videos using Uploads Playlist (best method for older content)...</p>';
 
       await Promise.all([
-        fetchAllFromChannel(channels.official, "Official 2PM", "2PM"),
-        fetchAllFromChannel(channels.junho, "Junho"),
-        fetchAllFromChannel(channels.taecyeon, "Taecyeon"),
-        fetchAllFromChannel(channels.junk, "Jun.K")
+        fetchAllFromPlaylist(uploadsPlaylists.official, "Official 2PM"),
+        fetchAllFromPlaylist(uploadsPlaylists.junho, "Junho"),
+        fetchAllFromPlaylist(uploadsPlaylists.taecyeon, "Taecyeon"),
+        fetchAllFromPlaylist(uploadsPlaylists.junk, "Jun.K")
       ]);
 
       allVideos = allVideos.filter((v, i, a) => a.findIndex(t => t.url === v.url) === i);
