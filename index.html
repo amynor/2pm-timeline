@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2PM Dynamic Video Timeline</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 15px; background: #111; color: #eee; }
+    h1 { text-align: center; margin-bottom: 15px; }
+    .controls { margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; }
+    input, select, button { padding: 10px 12px; border-radius: 6px; border: none; font-size: 15px; }
+    button { background: #e91e63; color: white; cursor: pointer; font-weight: bold; }
+    button:hover { background: #ff4081; }
+    #status { text-align: center; margin: 10px 0; font-weight: bold; }
+    #timeline { height: 80vh; overflow-y: auto; border: 2px solid #333; background: #1a1a1a; padding: 15px; border-radius: 10px; scroll-behavior: smooth; }
+    .event { display: flex; gap: 12px; margin-bottom: 20px; padding: 12px; border-radius: 10px; background: #222; transition: all 0.2s; cursor: pointer; }
+    .event:hover { background: #333; transform: translateX(8px); }
+    .thumbnail { width: 160px; height: 90px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+    .info { flex: 1; }
+    .date { font-size: 13px; color: #aaa; }
+    @media (max-width: 768px) {
+      .event { flex-direction: column; }
+      .thumbnail { width: 100%; height: 180px; }
+      .controls { flex-direction: column; align-items: stretch; }
+    }
+  </style>
+</head>
+<body>
+  <h1>2PM Dynamic Video Timeline</h1>
+  
+  <div class="controls">
+    <input type="text" id="apiKey" placeholder="Paste YouTube API Key here" style="width:100%; max-width:340px;">
+    <button onclick="fetchVideos()">🔄 Fetch / Refresh</button>
+    <button onclick="clearAllData()">🗑️ Clear Data</button>
+    
+    <input type="text" id="search" placeholder="Search titles..." onkeyup="filterTimeline()">
+    
+    <select id="memberFilter" onchange="filterTimeline()">
+      <option value="">All Members</option>
+      <option value="Junho">Junho</option>
+      <option value="Taecyeon">Taecyeon</option>
+      <option value="Jun.K">Jun.K</option>
+      <option value="Official">Official 2PM</option>
+    </select>
+    
+    <select id="yearFilter" onchange="filterTimeline()"></select>
+  </div>
+
+  <div id="status">Ready.</div>
+  <div id="timeline"></div>
+
+  <script>
+    let allVideos = [];
+    let apiKey = localStorage.getItem('youtubeApiKey') || '';
+
+    const channels = {
+      official: "UCaO6TYtlC8U5ttz62hTrZgg",
+      junho: "UCowTHOjp47dzNxR8cz83LGA",
+      taecyeon: "UCRX7AhiIgsKuVkVj4CrkjLA",
+      junk: "UCYHnkkcrclYlgiIeQKVs9Rw"
+    };
+
+    function loadSavedKey() {
+      if (apiKey) {
+        document.getElementById('apiKey').value = apiKey;
+        document.getElementById('status').innerHTML = '✅ API key loaded';
+      }
+    }
+
+    async function fetchAllFromChannel(channelId, channelName, extraQuery = "") {
+      if (!apiKey) return;
+      let pageToken = '';
+      let fetchedCount = 0;
+
+      do {
+        let url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${channelId}&part=snippet&maxResults=50&order=date&type=video&pageToken=${pageToken}`;
+        if (extraQuery) url += `&q=${encodeURIComponent(extraQuery)}`;
+
+        try {
+          const res = await fetch(url);
+          const data = await res.json();
+          
+          data.items?.forEach(item => {
+            const title = item.snippet.title;
+            const video = {
+              title, 
+              date: item.snippet.publishedAt.split('T')[0],
+              url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
+              thumb: item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default.url,
+              channel: channelName
+            };
+
+            if (channelName === "Official 2PM" && !title.toUpperCase().includes("2PM")) return;
+            allVideos.push(video);
+          });
+
+          fetchedCount += data.items?.length || 0;
+          pageToken = data.nextPageToken;
+
+          // Optional: Show progress
+          document.getElementById('status').innerHTML = `Fetching... (${fetchedCount} videos so far from ${channelName})`;
+
+        } catch(e) { 
+          console.error(e);
+          break; 
+        }
+      } while (pageToken);   // ← No limit now, continues until no more pages
+    }
+
+    async function fetchVideos() {
+      const inputKey = document.getElementById('apiKey').value.trim();
+      if (inputKey) {
+        apiKey = inputKey;
+        localStorage.setItem('youtubeApiKey', apiKey);
+      }
+      if (!apiKey) return alert("Please paste your API key");
+
+      allVideos = [];
+      document.getElementById('timeline').innerHTML = '<p style="text-align:center; color:#ff9800;">Fetching ALL videos (this may take a while)...</p>';
+
+      await Promise.all([
+        fetchAllFromChannel(channels.official, "Official 2PM", "2PM"),
+        fetchAllFromChannel(channels.junho, "Junho"),
+        fetchAllFromChannel(channels.taecyeon, "Taecyeon"),
+        fetchAllFromChannel(channels.junk, "Jun.K")
+      ]);
+
+      allVideos = allVideos.filter((v, i, a) => a.findIndex(t => t.url === v.url) === i);
+      allVideos.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      populateYearFilter();
+      renderTimeline(allVideos);
+      document.getElementById('status').innerHTML = `✅ Loaded ${allVideos.length} videos total`;
+    }
+
+    function renderTimeline(videos) {
+      const container = document.getElementById('timeline');
+      container.innerHTML = videos.length ? '' : '<p style="text-align:center;">No videos found.</p>';
+      
+      videos.forEach(video => {
+        const div = document.createElement('div');
+        div.className = 'event';
+        div.innerHTML = `
+          <img src="${video.thumb}" class="thumbnail">
+          <div class="info">
+            <div class="date">${video.date} • ${video.channel}</div>
+            <strong>${video.title}</strong>
+          </div>
+        `;
+        div.onclick = () => window.open(video.url, '_blank');
+        container.appendChild(div);
+      });
+    }
+
+    function populateYearFilter() {
+      const years = [...new Set(allVideos.map(v => v.date.substring(0,4)))].sort().reverse();
+      const select = document.getElementById('yearFilter');
+      select.innerHTML = '<option value="">All Years</option>';
+      years.forEach(year => {
+        const opt = document.createElement('option');
+        opt.value = year; 
+        opt.textContent = year;
+        select.appendChild(opt);
+      });
+    }
+
+    function filterTimeline() {
+      const searchTerm = document.getElementById('search').value.toLowerCase();
+      const member = document.getElementById('memberFilter').value.toLowerCase();
+      const year = document.getElementById('yearFilter').value;
+      
+      const filtered = allVideos.filter(v => {
+        const matchSearch = v.title.toLowerCase().includes(searchTerm);
+        const matchMember = !member || v.channel.toLowerCase().includes(member) || v.title.toLowerCase().includes(member);
+        const matchYear = !year || v.date.startsWith(year);
+        return matchSearch && matchMember && matchYear;
+      });
+      
+      renderTimeline(filtered);
+    }
+
+    function clearAllData() {
+      if (confirm("Clear everything?")) {
+        allVideos = [];
+        localStorage.removeItem('youtubeApiKey');
+        apiKey = '';
+        document.getElementById('apiKey').value = '';
+        document.getElementById('timeline').innerHTML = '';
+        document.getElementById('status').innerHTML = 'Data cleared.';
+      }
+    }
+
+    window.onload = loadSavedKey;
+  </script>
+</body>
+</html>
