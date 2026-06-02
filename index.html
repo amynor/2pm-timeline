@@ -41,6 +41,7 @@
       <option value="Taecyeon">Taecyeon</option>
       <option value="Jun.K">Jun.K</option>
       <option value="Official">Official 2PM</option>
+      <option value="Japan">2PM Japan</option>
     </select>
     
     <select id="yearFilter" onchange="filterTimeline()"></select>
@@ -57,7 +58,8 @@
       official: "UCaO6TYtlC8U5ttz62hTrZgg",
       junho: "UCowTHOjp47dzNxR8cz83LGA",
       taecyeon: "UCRX7AhiIgsKuVkVj4CrkjLA",
-      junk: "UCYHnkkcrclYlgiIeQKVs9Rw"
+      junk: "UCYHnkkcrclYlgiIeQKVs9Rw",
+      japan: "UUahG1TmHgXwdtVf2HZ9VdcA"
     };
 
     function loadSavedKey() {
@@ -122,7 +124,8 @@
         fetchAllFromChannel(channels.official, "Official 2PM", "2PM"),
         fetchAllFromChannel(channels.junho, "Junho"),
         fetchAllFromChannel(channels.taecyeon, "Taecyeon"),
-        fetchAllFromChannel(channels.junk, "Jun.K")
+        fetchAllFromChannel(channels.junk, "Jun.K"),
+        fetchAllFromChannel(channels.japan, "2PM Japan")
       ]);
 
       allVideos = allVideos.filter((v, i, a) => a.findIndex(t => t.url === v.url) === i);
